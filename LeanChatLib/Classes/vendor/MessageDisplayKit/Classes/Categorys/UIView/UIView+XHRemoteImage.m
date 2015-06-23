@@ -222,24 +222,48 @@ const char* const kXHMessageAvatorTypeKey   = "XHMessageAvatorTypeKey";
 /// wzf 将原来的通过URL下载，更改成为OSS方式下载
 + (void)dataWithContentsOfURL:(NSURL *)url completionBlock:(void (^)(NSURL *, NSData *, NSError *))completion {
     
-    id<XHRemoteImageVenderDownload> downloadVender = [XHRemoteImageVender sharedInstance].downloadVenderInstace;
-    if (downloadVender && [downloadVender respondsToSelector:@selector(remoteImageWithURL:completionBlock:)]) {
-        [downloadVender remoteImageWithURL:url completionBlock:completion];
+    NSString *imgUrlStr = url.absoluteString;
+    // 不是以"http://"开头的，用OSS方式实现
+    if (![imgUrlStr hasPrefix:@"http://"]) {
+        id<XHRemoteImageVenderDownload> downloadVender = [XHRemoteImageVender sharedInstance].downloadVenderInstace;
+        if (downloadVender && [downloadVender respondsToSelector:@selector(remoteImageWithURL:completionBlock:)]) {
+            [downloadVender remoteImageWithURL:url completionBlock:completion];
+            return;
+        }
     }
-    else {        
-        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-        [request setHTTPMethod:@"GET"];
-        [request setTimeoutInterval:5.0];
-        
-        [NSURLConnection sendAsynchronousRequest:request
-                                           queue:[self downloadQueue]
-                               completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-                                   if(completion) {
-                                       completion(url, data, connectionError);
-                                   }
+
+    // 其他方式
+    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+    [request setHTTPMethod:@"GET"];
+    [request setTimeoutInterval:5.0];
+    
+    [NSURLConnection sendAsynchronousRequest:request
+                                       queue:[self downloadQueue]
+                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+                               if(completion) {
+                                   completion(url, data, connectionError);
                                }
-         ];
-    }
+                           }
+     ];
+    
+//    id<XHRemoteImageVenderDownload> downloadVender = [XHRemoteImageVender sharedInstance].downloadVenderInstace;
+//    if (downloadVender && [downloadVender respondsToSelector:@selector(remoteImageWithURL:completionBlock:)]) {
+//        [downloadVender remoteImageWithURL:url completionBlock:completion];
+//    }
+//    else {        
+//        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+//        [request setHTTPMethod:@"GET"];
+//        [request setTimeoutInterval:5.0];
+//        
+//        [NSURLConnection sendAsynchronousRequest:request
+//                                           queue:[self downloadQueue]
+//                               completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+//                                   if(completion) {
+//                                       completion(url, data, connectionError);
+//                                   }
+//                               }
+//         ];
+//    }
     
 }
 
