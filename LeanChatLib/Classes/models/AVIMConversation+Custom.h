@@ -6,9 +6,12 @@
 //  Copyright (c) 2015年 avoscloud. All rights reserved.
 //
 
-#import <CDAVOSHeaders.h>
+#import <Foundation/Foundation.h>
+#import <AVOSCloudIM/AVOSCloudIM.h>
+#import "CDIMConfig.h"
 
 #define CONV_TYPE @"type"
+#define CONV_MEMBERS_KEY @"m"
 
 typedef enum : NSUInteger {
     CDConvTypeSingle = 0,

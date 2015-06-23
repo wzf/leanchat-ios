@@ -219,19 +219,28 @@ const char* const kXHMessageAvatorTypeKey   = "XHMessageAvatorTypeKey";
     return _sharedQueue;
 }
 
+/// wzf 将原来的通过URL下载，更改成为OSS方式下载
 + (void)dataWithContentsOfURL:(NSURL *)url completionBlock:(void (^)(NSURL *, NSData *, NSError *))completion {
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-    [request setHTTPMethod:@"GET"];
-    [request setTimeoutInterval:5.0];
     
-    [NSURLConnection sendAsynchronousRequest:request
-                                       queue:[self downloadQueue]
-                           completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-                               if(completion) {
-                                   completion(url, data, connectionError);
+    id<XHRemoteImageVenderDownload> downloadVender = [XHRemoteImageVender sharedInstance].downloadVenderInstace;
+    if (downloadVender && [downloadVender respondsToSelector:@selector(remoteImageWithURL:completionBlock:)]) {
+        [downloadVender remoteImageWithURL:url completionBlock:completion];
+    }
+    else {        
+        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
+        [request setHTTPMethod:@"GET"];
+        [request setTimeoutInterval:5.0];
+        
+        [NSURLConnection sendAsynchronousRequest:request
+                                           queue:[self downloadQueue]
+                               completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
+                                   if(completion) {
+                                       completion(url, data, connectionError);
+                                   }
                                }
-                           }
-     ];
+         ];
+    }
+    
 }
 
 - (void)load {
@@ -305,6 +314,23 @@ const char* const kXHMessageAvatorTypeKey   = "XHMessageAvatorTypeKey";
         self.loadingState = UIImageViewURLDownloadStateLoaded;
         [self hideLoadingView];
     }
+}
+
+@end
+
+
+@implementation XHRemoteImageVender
+
++ (instancetype)sharedInstance
+{
+    static dispatch_once_t onceToken;
+    static XHRemoteImageVender *sharedObj = nil;
+    dispatch_once(&onceToken, ^{
+        if (sharedObj == nil) {
+            sharedObj = [XHRemoteImageVender new];
+        }
+    });
+    return sharedObj;
 }
 
 @end

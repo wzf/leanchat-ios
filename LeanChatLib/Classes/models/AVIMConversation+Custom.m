@@ -19,7 +19,7 @@
 + (NSString *)nameOfUserIds:(NSArray *)userIds {
     NSMutableArray *names = [NSMutableArray array];
     for (int i = 0; i < userIds.count; i++) {
-        id <CDUserModel> user = [[CDIM sharedInstance].userDelegate getUserById:[userIds objectAtIndex:i]];
+        id <CDUserModel> user = [[CDIMConfig config].userDelegate getUserById:[userIds objectAtIndex:i]];
         [names addObject:user.username];
     }
     return [names componentsJoinedByString:@","];
@@ -28,7 +28,7 @@
 - (NSString *)displayName {
     if ([self type] == CDConvTypeSingle) {
         NSString *otherId = [self otherId];
-        id <CDUserModel> other = [[CDIM sharedInstance].userDelegate getUserById:otherId];
+        id <CDUserModel> other = [[CDIMConfig config].userDelegate getUserById:otherId];
         return other.username;
     }
     else {
@@ -41,11 +41,12 @@
     if (members.count != 2) {
         [NSException raise:@"invalid conv" format:nil];
     }
-    if ([members containsObject:[CDIM sharedInstance].selfId] == NO) {
+    CDIM *im = [CDIM sharedInstance];
+    if ([members containsObject:im.selfId] == NO) {
         [NSException raise:@"invalid conv" format:nil];
     }
     NSString *otherId;
-    if ([members[0] isEqualToString:[CDIM sharedInstance].selfId]) {
+    if ([members[0] isEqualToString:im.selfId]) {
         otherId = members[1];
     }
     else {

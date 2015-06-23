@@ -9,12 +9,26 @@
 #import "CDIM.h"
 #import "CDRoom.h"
 #import "CDStorage.h"
+#import "CDNotify.h"
 #import "CDMacros.h"
 #import "CDEmotionUtils.h"
+#import "CDIMConfig.h"
 
 static CDIM *instance;
 
+@interface CDIMConfig ()
+
+@property (nonatomic, readwrite) NSString *selfId;
+
+@end
+
 @interface CDIM () <AVIMClientDelegate, AVIMSignatureDataSource>
+
+@property CDStorage *storage;
+
+@property CDIMConfig *imConfig;
+
+@property CDNotify *notify;
 
 @property (nonatomic, strong) NSMutableDictionary *cachedConvs;
 
@@ -25,40 +39,39 @@ static CDIM *instance;
 #pragma mark - lifecycle
 
 + (instancetype)sharedInstance {
-    static dispatch_once_t token;
-    dispatch_once(&token, ^{
+    if (instance == nil) {
         instance = [[CDIM alloc] init];
-    });
+    }
     return instance;
 }
 
 - (instancetype)init {
     self = [super init];
     if (self) {
-        [AVIMClient defaultClient].delegate =self;
+        _imClient = [[AVIMClient alloc] init];
+        _imClient.delegate = self;
         /* 取消下面的注释，将对 im的 open ，start(create conv),kick,invite 操作签名，更安全
          可以从你的服务器获得签名，这里从云代码获取，需要部署云代码，https://github.com/leancloud/leanchat-cloudcode
          */
         //        _imClient.signatureDataSource=self;
+        _storage = [CDStorage sharedInstance];
+        _notify = [CDNotify sharedInstance];
+        _imConfig = [CDIMConfig config];
         _cachedConvs = [NSMutableDictionary dictionary];
         [self updateConnectStatus];
     }
     return self;
 }
 
-- (AVIMClient *)imClient {
-    return [AVIMClient defaultClient];
-}
-
 - (void)dealloc {
-    [[AVIMClient defaultClient] removeObserver:self forKeyPath:@"status"];
+    [_imClient removeObserver:self forKeyPath:@"status"];
 }
 
 - (void)openWithClientId:(NSString *)clientId callback:(AVIMBooleanResultBlock)callback {
     _selfId = clientId;
-    _selfUser = [self.userDelegate getUserById:clientId];
-    [[CDStorage storage] setupWithUserId:clientId];
-    [[AVIMClient defaultClient] openWithClientId:clientId callback:^(BOOL succeeded, NSError *error) {
+    _selfUser = [self.imConfig.userDelegate getUserById:clientId];
+    [self.storage setupWithUserId:clientId];
+    [_imClient openWithClientId:clientId callback:^(BOOL succeeded, NSError *error) {
         [self updateConnectStatus];
         if (callback) {
             callback(succeeded, error);
@@ -67,13 +80,13 @@ static CDIM *instance;
 }
 
 - (void)closeWithCallback:(AVBooleanResultBlock)callback {
-    [[AVIMClient defaultClient] closeWithCallback:callback];
+    [_imClient closeWithCallback:callback];
 }
 
 #pragma mark - conversation
 
-- (void)fecthConvWithConvid:(NSString *)convid callback:(AVIMConversationResultBlock)callback {
-    AVIMConversationQuery *q = [[AVIMClient defaultClient] conversationQuery];
+- (void)fecthConvWithId:(NSString *)convid callback:(AVIMConversationResultBlock)callback {
+    AVIMConversationQuery *q = [_imClient conversationQuery];
     [q whereKey:@"objectId" equalTo:convid];
     [q findConversationsWithCallback: ^(NSArray *objects, NSError *error) {
         if (error) {
@@ -86,9 +99,9 @@ static CDIM *instance;
 }
 
 - (void)fetchConvWithMembers:(NSArray *)members type:(CDConvType)type callback:(AVIMConversationResultBlock)callback {
-    AVIMConversationQuery *q = [[AVIMClient defaultClient] conversationQuery];
+    AVIMConversationQuery *q = [_imClient conversationQuery];
     [q whereKey:AVIMAttr(CONV_TYPE) equalTo:@(type)];
-    [q whereKey:kAVIMKeyMember containsAllObjectsInArray:members];
+    [q whereKey:CONV_MEMBERS_KEY containsAllObjectsInArray:members];
     [q findConversationsWithCallback: ^(NSArray *objects, NSError *error) {
         if (error) {
             callback(nil, error);
@@ -111,7 +124,7 @@ static CDIM *instance;
 
 - (void)fetchConvWithOtherId:(NSString *)otherId callback:(AVIMConversationResultBlock)callback {
     NSMutableArray *array = [[NSMutableArray alloc] init];
-    [array addObject:[AVIMClient defaultClient].clientId];
+    [array addObject:_imClient.clientId];
     [array addObject:otherId];
     [self fetchConvWithMembers:array type:CDConvTypeSingle callback:callback];
 }
@@ -121,13 +134,13 @@ static CDIM *instance;
     if (type == CDConvTypeGroup) {
         name = [AVIMConversation nameOfUserIds:members];
     }
-    [[AVIMClient defaultClient] createConversationWithName:name clientIds:members attributes:@{ CONV_TYPE:@(type) } options:AVIMConversationOptionNone callback:callback];
+    [_imClient createConversationWithName:name clientIds:members attributes:@{ CONV_TYPE:@(type) } options:AVIMConversationOptionNone callback:callback];
 }
 
 - (void)findGroupedConvsWithBlock:(AVIMArrayResultBlock)block {
-    AVIMConversationQuery *q = [[AVIMClient defaultClient] conversationQuery];
+    AVIMConversationQuery *q = [_imClient conversationQuery];
     [q whereKey:AVIMAttr(CONV_TYPE) equalTo:@(CDConvTypeGroup)];
-    [q whereKey:kAVIMKeyMember containedIn:@[self.selfId]];
+    [q whereKey:CONV_MEMBERS_KEY containedIn:@[self.selfId]];
     q.limit = 1000;
     [q findConversationsWithCallback:block];
 }
@@ -145,7 +158,7 @@ static CDIM *instance;
 
 - (void)fetchConvsWithConvids:(NSSet *)convids callback:(AVIMArrayResultBlock)callback {
     if (convids.count > 0) {
-        AVIMConversationQuery *q = [[AVIMClient defaultClient] conversationQuery];
+        AVIMConversationQuery *q = [_imClient conversationQuery];
         [q whereKey:@"objectId" containedIn:[convids allObjects]];
         q.limit = 1000;  // default limit:10
         [q findConversationsWithCallback:callback];
@@ -157,29 +170,29 @@ static CDIM *instance;
 
 #pragma mark - query msgs
 
-- (void)queryTypedMessagesWithConversation:(AVIMConversation *)conversation timestamp:(int64_t)timestamp limit:(NSInteger)limit block:(AVIMArrayResultBlock)block {
-    AVIMArrayResultBlock callback = ^(NSArray *messages, NSError *error) {
-        NSMutableArray *typedMessages = [NSMutableArray array];
-        for (AVIMTypedMessage *message in messages) {
-            if ([message isKindOfClass:[AVIMTypedMessage class]]) {
-                [typedMessages addObject:message];
-            }
-        }
-        block(typedMessages, error);
-    };
-    if(timestamp == 0) {
-        [conversation queryMessagesWithLimit:limit callback:callback];
-    } else {
-        [conversation queryMessagesBeforeId:nil timestamp:timestamp limit:limit callback:callback];
+- (NSArray *)queryMsgsWithConv:(AVIMConversation *)conv msgId:(NSString *)msgId maxTime:(int64_t)time limit:(int)limit error:(NSError **)theError {
+    dispatch_semaphore_t sema = dispatch_semaphore_create(0);
+    __block NSArray *result;
+    __block NSError *blockError = nil;
+    [conv queryMessagesBeforeId:msgId timestamp:time limit:limit callback: ^(NSArray *objects, NSError *error) {
+        result = objects;
+        blockError = error;
+        dispatch_semaphore_signal(sema);
+    }];
+    dispatch_semaphore_wait(sema, DISPATCH_TIME_FOREVER);
+    *theError = blockError;
+    if (blockError == nil) {
     }
+    return result;
 }
 
 #pragma mark - send or receive message
 
 - (void)receiveMsg:(AVIMTypedMessage *)msg conv:(AVIMConversation *)conv {
-    [[CDStorage storage] insertRoomWithConvid:conv.conversationId];
-    [[CDStorage storage] incrementUnreadWithConvid:conv.conversationId];
-    [[NSNotificationCenter defaultCenter] postNotificationName:kCDNotificationMessageReceived object:msg];
+    [_storage insertRoomWithConvid:conv.conversationId];
+    [_storage insertMsg:msg];
+    [_storage incrementUnreadWithConvid:conv.conversationId];
+    [_notify postMsgNotify:msg];
 }
 
 #pragma mark - AVIMClientDelegate
@@ -199,7 +212,7 @@ static CDIM *instance;
 #pragma mark - status
 
 - (void)updateConnectStatus {
-    self.connect = [AVIMClient defaultClient].status == AVIMClientStatusOpened;
+    self.connect = self.imClient.status == AVIMClientStatusOpened;
 }
 
 #pragma mark - AVIMMessageDelegate
@@ -221,7 +234,8 @@ static CDIM *instance;
 - (void)conversation:(AVIMConversation *)conversation messageDelivered:(AVIMMessage *)message {
     DLog();
     if (message != nil) {
-        [[NSNotificationCenter defaultCenter] postNotificationName:kCDNotificationMessageDelivered object:message];
+        [_storage updateStatus:AVIMMessageStatusDelivered byMsgId:message.messageId];
+        [_notify postMsgNotify:(AVIMTypedMessage *)message];
     }
 }
 
@@ -330,7 +344,6 @@ static CDIM *instance;
 }
 
 #pragma mark - conv cache
-
 - (AVIMConversation *)lookupConvById:(NSString *)convid {
     return [self.cachedConvs valueForKey:convid];
 }
@@ -360,7 +373,7 @@ static CDIM *instance;
 }
 
 - (void)findRecentRoomsWithBlock:(AVArrayResultBlock)block {
-    NSMutableArray *rooms = [[[CDStorage storage] getRooms] mutableCopy];
+    NSMutableArray *rooms = [[self.storage getRooms] mutableCopy];
     NSMutableSet *convids = [NSMutableSet set];
     for (CDRoom *room in rooms) {
         [convids addObject:room.convid];
@@ -378,7 +391,7 @@ static CDIM *instance;
                     [filterRooms addObject:room];
                 }
                 else {
-                    [NSException raise:@"IM" format:@"conv is nil"];
+//                    [NSException raise:@"IM" format:@"conv is nil"];
                 }
             }
             NSMutableSet *userIds = [NSMutableSet set];
@@ -386,20 +399,13 @@ static CDIM *instance;
                 if (room.conv.type == CDConvTypeSingle) {
                     [userIds addObject:room.conv.otherId];
                 }
-                NSArray *lastestMessages = [room.conv queryMessagesFromCacheWithLimit:1];
-                if (lastestMessages.count > 0) {
-                    room.lastMsg = lastestMessages[0];
-                }
             }
-            NSArray *sortedRooms = [filterRooms sortedArrayUsingComparator:^NSComparisonResult(CDRoom *room1, CDRoom *room2) {
-                return room2.lastMsg.sendTimestamp - room1.lastMsg.sendTimestamp;
-            }];
-            [self.userDelegate cacheUserByIds:userIds block: ^(BOOL succeeded, NSError *error) {
+            [[weakSelf imConfig].userDelegate cacheUserByIds:userIds block: ^(BOOL succeeded, NSError *error) {
                 if (error) {
                     block(nil, error);
                 }
                 else {
-                    block(sortedRooms, error);
+                    block(filterRooms, error);
                 }
             }];
         }

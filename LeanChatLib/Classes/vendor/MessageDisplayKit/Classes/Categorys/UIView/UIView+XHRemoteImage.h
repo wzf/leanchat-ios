@@ -50,3 +50,15 @@ typedef NS_ENUM(NSInteger, UIImageViewURLDownloadState) {
 - (void)load;
 
 @end
+
+
+/// wzf 增加这样的一个类，通过外链的方式，将image的下载开放出去
+@protocol XHRemoteImageVenderDownload <NSObject>
+- (void)remoteImageWithURL:(NSURL *)url completionBlock:(void (^)(NSURL *, NSData *, NSError *))completion;
+@end
+
+@interface XHRemoteImageVender : NSObject
++ (instancetype)sharedInstance;
+@property (weak, nonatomic) id<XHRemoteImageVenderDownload> downloadVenderInstace;
+@end
+
