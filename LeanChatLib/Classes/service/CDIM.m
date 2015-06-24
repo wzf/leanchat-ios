@@ -72,7 +72,7 @@ static CDIM *instance;
 
 #pragma mark - conversation
 
-- (void)fecthConvWithConvid:(NSString *)convid callback:(AVIMConversationResultBlock)callback {
+- (void)fetchConvWithConvid:(NSString *)convid callback:(AVIMConversationResultBlock)callback {
     AVIMConversationQuery *q = [[AVIMClient defaultClient] conversationQuery];
     [q whereKey:@"objectId" equalTo:convid];
     [q findConversationsWithCallback: ^(NSArray *objects, NSError *error) {

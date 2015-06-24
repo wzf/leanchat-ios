@@ -42,7 +42,7 @@ static NSString *const kCDNotificationConversationUpdated = @"ConversationUpdate
 - (void)openWithClientId:(NSString *)clientId callback:(AVIMBooleanResultBlock)callback;
 - (void)closeWithCallback:(AVBooleanResultBlock)callback;
 
-- (void)fecthConvWithConvid:(NSString *)convid callback:(AVIMConversationResultBlock)callback;
+- (void)fetchConvWithConvid:(NSString *)convid callback:(AVIMConversationResultBlock)callback;
 - (void)fetchConvsWithConvids:(NSSet *)convids callback:(AVIMArrayResultBlock)callback;
 - (void)fetchConvWithOtherId:(NSString *)otherId callback:(AVIMConversationResultBlock)callback;
 - (void)fetchConvWithMembers:(NSArray *)members callback:(AVIMConversationResultBlock)callback;
