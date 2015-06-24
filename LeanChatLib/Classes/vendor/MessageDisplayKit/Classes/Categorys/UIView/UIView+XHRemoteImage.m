@@ -225,14 +225,15 @@ const char* const kXHMessageAvatorTypeKey   = "XHMessageAvatorTypeKey";
     NSString *imgUrlStr = url.absoluteString;
     // 不是以"http://"开头的，用OSS方式实现
     if (![imgUrlStr hasPrefix:@"http://"]) {
-        id<XHRemoteImageVenderDownload> downloadVender = [XHRemoteImageVender sharedInstance].downloadVenderInstace;
+        // OSS方式交给downloadVender处理
+        id<XHRemoteImageVenderDownload> downloadVender = [XHRemoteImageVender sharedInstance].downloadVender;
         if (downloadVender && [downloadVender respondsToSelector:@selector(remoteImageWithURL:completionBlock:)]) {
             [downloadVender remoteImageWithURL:url completionBlock:completion];
             return;
         }
     }
 
-    // 其他方式
+    // 其他方式，在线加载
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     [request setHTTPMethod:@"GET"];
     [request setTimeoutInterval:5.0];
@@ -245,26 +246,6 @@ const char* const kXHMessageAvatorTypeKey   = "XHMessageAvatorTypeKey";
                                }
                            }
      ];
-    
-//    id<XHRemoteImageVenderDownload> downloadVender = [XHRemoteImageVender sharedInstance].downloadVenderInstace;
-//    if (downloadVender && [downloadVender respondsToSelector:@selector(remoteImageWithURL:completionBlock:)]) {
-//        [downloadVender remoteImageWithURL:url completionBlock:completion];
-//    }
-//    else {        
-//        NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
-//        [request setHTTPMethod:@"GET"];
-//        [request setTimeoutInterval:5.0];
-//        
-//        [NSURLConnection sendAsynchronousRequest:request
-//                                           queue:[self downloadQueue]
-//                               completionHandler:^(NSURLResponse *response, NSData *data, NSError *connectionError) {
-//                                   if(completion) {
-//                                       completion(url, data, connectionError);
-//                                   }
-//                               }
-//         ];
-//    }
-    
 }
 
 - (void)load {
