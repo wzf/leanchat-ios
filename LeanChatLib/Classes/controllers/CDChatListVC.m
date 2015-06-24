@@ -14,24 +14,15 @@
 #import "CDIM.h"
 #import "CDMacros.h"
 #import "AVIMConversation+Custom.h"
-#import "CDIMConfig.h"
 #import "UIView+XHRemoteImage.h"
 #import "CDEmotionUtils.h"
-#import "CDNotify.h"
+#import <DateTools/DateTools.h>
 
 @interface CDChatListVC ()
 
-@property (nonatomic) LZStatusView *clientStatusView;
+@property (nonatomic, strong) LZStatusView *clientStatusView;
 
 @property (nonatomic, strong) NSMutableArray *rooms;
-
-@property (nonatomic, strong) CDNotify *notify;
-
-@property (nonatomic, strong) CDIM *im;
-
-@property (nonatomic, strong) CDStorage *storage;
-
-@property (nonatomic, strong) CDIMConfig *imConfig;
 
 @end
 
@@ -44,10 +35,6 @@ static NSString *cellIdentifier = @"ContactCell";
 - (instancetype)init {
     if ((self = [super init])) {
         _rooms = [[NSMutableArray alloc] init];
-        _im = [CDIM sharedInstance];
-        _storage = [CDStorage sharedInstance];
-        _notify = [CDNotify sharedInstance];
-        _imConfig = [CDIMConfig config];
     }
     return self;
 }
@@ -60,8 +47,8 @@ static NSString *cellIdentifier = @"ContactCell";
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    [_notify addMsgObserver:self selector:@selector(refresh)];
-    [self.im addObserver:self forKeyPath:@"connect" options:NSKeyValueObservingOptionNew context:NULL];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(refresh) name:kCDNotificationMessageReceived object:nil];
+    [[CDIM sharedInstance] addObserver:self forKeyPath:@"connect" options:NSKeyValueObservingOptionNew context:NULL];
     [self updateStatusView];
     WEAKSELF
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
@@ -71,8 +58,8 @@ static NSString *cellIdentifier = @"ContactCell";
 
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
-    [_im removeObserver:self forKeyPath:@"connect"];
-    [_notify removeMsgObserver:self];
+    [[CDIM sharedInstance] removeObserver:self forKeyPath:@"connect"];
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:kCDNotificationMessageReceived object:nil];
 }
 
 #pragma mark - Propertys
@@ -116,15 +103,12 @@ static NSString *cellIdentifier = @"ContactCell";
 }
 
 - (void)refresh:(UIRefreshControl *)refreshControl {
-    [self.im findRecentRoomsWithBlock: ^(NSArray *objects, NSError *error) {
+    [[CDIM sharedInstance] findRecentRoomsWithBlock: ^(NSArray *objects, NSError *error) {
         [self stopRefreshControl:refreshControl];
         if ([self filterError:error]) {
-            _rooms = objects;
+            _rooms = [objects mutableCopy];
             [self.tableView reloadData];
-            NSInteger totalUnreadCount = 0;
-            for (CDRoom *room in _rooms) {
-                totalUnreadCount += room.unreadCount;
-            }
+            NSInteger totalUnreadCount = [[CDStorage storage] countUnread];
             if ([self.chatListDelegate respondsToSelector:@selector(setBadgeWithTotalUnreadCount:)]) {
                 [self.chatListDelegate setBadgeWithTotalUnreadCount:totalUnreadCount];
             }
@@ -168,7 +152,7 @@ static NSString *cellIdentifier = @"ContactCell";
     LZConversationCell *cell = [LZConversationCell dequeueOrCreateCellByTableView:tableView];
     CDRoom *room = [_rooms objectAtIndex:indexPath.row];
     if (room.conv.type == CDConvTypeSingle) {
-        id <CDUserModel> user = [[CDIMConfig config].userDelegate getUserById:room.conv.otherId];
+        id <CDUserModel> user = [[CDIM sharedInstance].userDelegate getUserById:room.conv.otherId];
         cell.nameLabel.text = user.username;
         [cell.avatarImageView setImageWithURL:[NSURL URLWithString:user.avatarUrl]];
     }
@@ -178,10 +162,7 @@ static NSString *cellIdentifier = @"ContactCell";
     }
     cell.messageLabel.text = [self getMessageTitle:room.lastMsg];
     if (room.lastMsg) {
-        NSDateFormatter *dateFormatter = [[NSDateFormatter alloc] init];
-        [dateFormatter setDateFormat:@"MM-dd HH:mm"];
-        NSString *timeString = [dateFormatter stringFromDate:[NSDate dateWithTimeIntervalSince1970:room.lastMsg.sendTimestamp / 1000]];
-        cell.timestampLabel.text = timeString;
+        cell.timestampLabel.text = [[NSDate dateWithTimeIntervalSince1970:room.lastMsg.sendTimestamp / 1000] timeAgoSinceNow];
     }
     else {
         cell.timestampLabel.text = @"";
@@ -193,7 +174,7 @@ static NSString *cellIdentifier = @"ContactCell";
 - (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)editingStyle forRowAtIndexPath:(NSIndexPath *)indexPath {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
         CDRoom *room = [_rooms objectAtIndex:indexPath.row];
-        [_storage deleteRoomByConvid:room.conv.conversationId];
+        [[CDStorage storage] deleteRoomByConvid:room.conv.conversationId];
         [self refresh];
     }
 }
@@ -203,6 +184,7 @@ static NSString *cellIdentifier = @"ContactCell";
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
     CDRoom *room = [_rooms objectAtIndex:indexPath.row];
     if ([self.chatListDelegate respondsToSelector:@selector(viewController:didSelectConv:)]) {
         [self.chatListDelegate viewController:self didSelectConv:room.conv];
@@ -216,13 +198,13 @@ static NSString *cellIdentifier = @"ContactCell";
 #pragma mark - connect
 
 - (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context {
-    if (object == self.im && [keyPath isEqualToString:@"status"]) {
+    if (object == [CDIM sharedInstance] && [keyPath isEqualToString:@"status"]) {
         [self updateStatusView];
     }
 }
 
 - (void)updateStatusView {
-    if (self.im.connect) {
+    if ([CDIM sharedInstance].connect) {
         self.tableView.tableHeaderView = nil ;
     }else {
         self.tableView.tableHeaderView = self.clientStatusView;

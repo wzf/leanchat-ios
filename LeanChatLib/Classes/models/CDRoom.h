@@ -9,14 +9,14 @@
 #import <Foundation/Foundation.h>
 #import "CDAVOSHeaders.h"
 
-@interface CDRoom : NSObject
+@interface CDRoom : NSObject<NSCoding>
 
-@property NSString *convid;
+@property (nonatomic, strong) NSString *convid;
 
-@property AVIMConversation *conv;
+@property (nonatomic, strong) AVIMConversation *conv;
 
-@property AVIMTypedMessage *lastMsg;
+@property (nonatomic, strong) AVIMTypedMessage *lastMsg;
 
-@property NSInteger unreadCount;
+@property (nonatomic, assign) NSInteger unreadCount;
 
 @end

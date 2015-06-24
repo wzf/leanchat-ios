@@ -15,8 +15,6 @@
 
 @property (nonatomic, strong) NSMutableArray *msgs;
 
-@property (nonatomic, strong) CDIM *im;
-
 - (instancetype)initWithConv:(AVIMConversation *)conv;
 
 @end
