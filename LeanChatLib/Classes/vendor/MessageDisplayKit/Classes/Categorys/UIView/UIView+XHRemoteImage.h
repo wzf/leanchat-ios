@@ -59,6 +59,6 @@ typedef NS_ENUM(NSInteger, UIImageViewURLDownloadState) {
 
 @interface XHRemoteImageVender : NSObject
 + (instancetype)sharedInstance;
-@property (weak, nonatomic) id<XHRemoteImageVenderDownload> downloadVenderInstace;
+@property (weak, nonatomic) id<XHRemoteImageVenderDownload> downloadVender;
 @end
 
