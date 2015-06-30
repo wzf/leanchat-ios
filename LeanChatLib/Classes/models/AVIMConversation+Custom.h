@@ -11,8 +11,10 @@
 #define CONV_TYPE @"type"
 
 typedef enum : NSUInteger {
-    CDConvTypeSingle = 0,
-    CDConvTypeGroup,
+    CDConvTypeSingle  = 0,
+    CDConvTypeGroup   = 1,
+    CDConvTypePrivate = 2,//密聊
+    CDConvTypeOpen    = 3,//开放聊天室
 } CDConvType;
 
 @interface AVIMConversation (Custom)
