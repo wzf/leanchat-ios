@@ -23,4 +23,6 @@
 - (void)incrementUnreadWithConvid:(NSString *)convid;
 - (void)clearUnreadWithConvid:(NSString *)convid;
 
+// 查找一个convid是否已经存在
+- (AVIMConversation *)lookupConvWithConvid:(NSString *)convid;
 @end

@@ -108,4 +108,14 @@ static CDStorage *storageInstance;
     [self saveData];
 }
 
+// 查找一个convid是否已经存在
+- (AVIMConversation *)lookupConvWithConvid:(NSString *)convid;
+{
+    CDRoom *room = [self findRoomWithConvid:convid];
+    if (room && room.conv) {
+        return room.conv;
+    }
+    return nil;
+}
+
 @end
