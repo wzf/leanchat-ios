@@ -8,7 +8,8 @@
 
 #import <CDAVOSHeaders.h>
 
-#define CONV_TYPE @"type"
+#define CONV_TYPE    @"type"
+#define CONV_MEMBERS @"m"
 
 typedef enum : NSUInteger {
     CDConvTypeSingle  = 0,
