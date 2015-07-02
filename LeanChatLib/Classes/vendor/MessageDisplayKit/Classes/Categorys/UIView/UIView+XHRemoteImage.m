@@ -172,6 +172,7 @@ const char* const kXHMessageAvatorTypeKey   = "XHMessageAvatorTypeKey";
     } else if ([self isKindOfClass:[UIImageView class]]) {
         UIImageView *currentImageView = (UIImageView *)self;
         currentImageView.image = image;
+        currentImageView.highlightedImage = image;  //增加highlightedImage,以免在cell选中情况下出现placeImage的BUG
     }
 }
 
