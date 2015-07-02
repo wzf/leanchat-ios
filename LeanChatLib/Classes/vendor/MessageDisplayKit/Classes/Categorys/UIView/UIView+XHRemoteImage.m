@@ -305,7 +305,10 @@ const char* const kXHMessageAvatorTypeKey   = "XHMessageAvatorTypeKey";
         if(error) {
             self.loadingState = UIImageViewURLDownloadStateFailed;
         } else {
-            [self performSelectorOnMainThread:@selector(setupImage:) withObject:image waitUntilDone:NO];
+            // image有效的前提下，再填充，不然不做任何操作
+            if (image) {
+                [self performSelectorOnMainThread:@selector(setupImage:) withObject:image waitUntilDone:NO];
+            }
             self.loadingState = UIImageViewURLDownloadStateLoaded;
         }
         [self hideLoadingView];
