@@ -11,9 +11,12 @@
 #import "CDUserModel.h"
 #import "AVIMConversation+Custom.h"
 
-static NSString *const kCDNotificationMessageReceived = @"MessageReceived";
-static NSString *const kCDNotificationMessageDelivered = @"MessageDelivered";
+static NSString *const kCDNotificationMessageReceived     = @"MessageReceived";
+static NSString *const kCDNotificationMessageDelivered    = @"MessageDelivered";
 static NSString *const kCDNotificationConversationUpdated = @"ConversationUpdated";
+static NSString *const kCDNotificationInvitedByOther      = @"invitedByOtherID";
+static NSString *const kCDNotificationMemberAdded         = @"membersAdded";
+static NSString *const kCDNotificationMemberRemoved       = @"membersRemoved";
 
 @protocol CDUserDelegate <NSObject>
 

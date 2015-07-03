@@ -227,14 +227,23 @@ static CDIM *instance;
 
 - (void)conversation:(AVIMConversation *)conversation membersAdded:(NSArray *)clientIds byClientId:(NSString *)clientId {
     DLog();
+    if (conversation) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:kCDNotificationMemberAdded object:conversation];
+    }
 }
 
 - (void)conversation:(AVIMConversation *)conversation membersRemoved:(NSArray *)clientIds byClientId:(NSString *)clientId {
     DLog();
+    if (conversation) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:kCDNotificationMemberRemoved object:conversation];
+    }
 }
 
 - (void)conversation:(AVIMConversation *)conversation invitedByClientId:(NSString *)clientId {
     DLog();
+    if (conversation) {
+        [[NSNotificationCenter defaultCenter] postNotificationName:kCDNotificationInvitedByOther object:conversation];
+    }
 }
 
 - (void)conversation:(AVIMConversation *)conversation kickedByClientId:(NSString *)clientId {
