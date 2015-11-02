@@ -17,4 +17,6 @@
 
 - (instancetype)initWithConv:(AVIMConversation *)conv;
 
+- (void)refreshConv;
+
 @end
